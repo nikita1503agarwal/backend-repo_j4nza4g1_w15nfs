@@ -1,8 +1,13 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional, List
 
-app = FastAPI()
+from schemas import Lead
+from database import create_document, get_documents
+
+app = FastAPI(title="LocalAI Assist API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,6 +24,27 @@ def read_root():
 @app.get("/api/hello")
 def hello():
     return {"message": "Hello from the backend API!"}
+
+# Lead capture endpoints
+@app.post("/leads")
+def create_lead(lead: Lead):
+    try:
+        lead_id = create_document("lead", lead)
+        return {"ok": True, "id": lead_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/leads")
+def list_leads(limit: Optional[int] = 50):
+    try:
+        docs = get_documents("lead", limit=limit)
+        # Convert ObjectId to string for JSON safety
+        for d in docs:
+            if "_id" in d:
+                d["_id"] = str(d["_id"])
+        return {"ok": True, "items": docs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/test")
 def test_database():
